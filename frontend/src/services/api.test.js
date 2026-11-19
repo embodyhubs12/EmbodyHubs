@@ -28,6 +28,17 @@ describe('auth session barrier',()=>{
     expect(result.message).toBe('Signed out securely.');expect(calls.map(value=>value.split('/api/v1')[1])).toEqual(['/auth/refresh','/auth/logout']);
   });
 
+  it('keeps the returned CSRF token in origin-scoped session storage',async()=>{
+    const values=new Map();
+    vi.stubGlobal('sessionStorage',{getItem:key=>values.get(key)||null,setItem:(key,value)=>values.set(key,value),removeItem:key=>values.delete(key)});
+    vi.stubGlobal('document',{cookie:''});
+    const requests=[];
+    vi.stubGlobal('fetch',vi.fn(async(url,options)=>{requests.push({url:String(url),options});return requests.length===1?jsonResponse({success:true,data:{user:{id:'customer'},sessionExpiresAt:new Date(Date.now()+86_400_000).toISOString(),csrfToken:'origin-token'}}):jsonResponse({success:true,data:{profile:{id:'customer'}}})}));
+    await api.login({email:'customer@example.com',password:'SecurePassword!123'});
+    await api.updateProfile({firstName:'Taylor'});
+    expect(requests[1].options.headers['X-CSRF-Token']).toBe('origin-token');
+  });
+
   it('submits a health information enquiry to the dedicated public endpoint',async()=>{
     let request;
     vi.stubGlobal('fetch',vi.fn(async(url,options)=>{request={url:String(url),options};return jsonResponse({success:true,data:{reference:'ENQ-123'}})}));

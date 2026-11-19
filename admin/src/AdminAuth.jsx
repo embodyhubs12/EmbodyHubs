@@ -13,7 +13,7 @@ function restoreAdminSession(){
 function readCachedSession(){
   try{
     const value=JSON.parse(sessionStorage.getItem(CACHE_KEY)||'null');
-    if(!value?.user||!value?.sessionExpiresAt||new Date(value.sessionExpiresAt).getTime()<=Date.now())return null;
+    if(!value?.user||!value?.sessionExpiresAt||!value?.csrfToken||new Date(value.sessionExpiresAt).getTime()<=Date.now())return null;
     return value;
   }catch{
     sessionStorage.removeItem(CACHE_KEY);
@@ -34,23 +34,23 @@ export function AdminAuthProvider({children}){
     sessionStorage.removeItem('embody-admin-user');
   };
 
-  const storeSession=(next,expiresAt)=>{
-    if(!expiresAt)throw new Error('The server did not provide a session expiry.');
-    const session={user:next,sessionExpiresAt:expiresAt};
+  const storeSession=(next,expiresAt,csrfToken)=>{
+    if(!expiresAt||!csrfToken)throw new Error('The server did not provide complete session security data.');
+    const session={user:next,sessionExpiresAt:expiresAt,csrfToken};
     setUser(next);
     setSessionExpiresAt(expiresAt);
     sessionStorage.setItem(CACHE_KEY,JSON.stringify(session));
   };
 
   useEffect(()=>{
-    if(!document.cookie.includes('adminCsrfToken=')&&!document.cookie.includes('csrfToken=')){
+    if(!readCachedSession()){
       clearLocalSession();
       setChecking(false);
       return;
     }
     restoreAdminSession().then(result=>{
       if(result.data.user.role==='CUSTOMER')throw new Error('Admin role required.');
-      storeSession(result.data.user,result.data.sessionExpiresAt);
+      storeSession(result.data.user,result.data.sessionExpiresAt,result.data.csrfToken);
     }).catch(clearLocalSession).finally(()=>setChecking(false));
   },[]);
 
@@ -64,7 +64,7 @@ export function AdminAuthProvider({children}){
     return()=>window.clearTimeout(timer);
   },[user,sessionExpiresAt]);
 
-  const completeLogin=(next,expiresAt)=>storeSession(next,expiresAt);
+  const completeLogin=(next,expiresAt,csrfToken)=>storeSession(next,expiresAt,csrfToken);
   const logout=async()=>{try{await adminApi.logout()}finally{sessionBootstrap=null;clearLocalSession()}};
   return <Context.Provider value={{user,checking,sessionExpiresAt,completeLogin,logout}}>{children}</Context.Provider>;
 }

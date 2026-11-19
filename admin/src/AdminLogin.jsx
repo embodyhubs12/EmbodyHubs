@@ -17,7 +17,7 @@ export default function AdminLogin(){
       const form=Object.fromEntries(new FormData(event.currentTarget));
       const result=await adminApi.login(form);
       if(result.data.user.role==='CUSTOMER')throw new Error('An administrator role is required.');
-      completeLogin(result.data.user,result.data.sessionExpiresAt);
+      completeLogin(result.data.user,result.data.sessionExpiresAt,result.data.csrfToken);
     }catch(err){
       setError(err.message);
     }finally{

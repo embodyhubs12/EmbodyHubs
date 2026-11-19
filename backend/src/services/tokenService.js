@@ -9,8 +9,9 @@ const TEN_MINUTES_MS=10*60*1000;
 const ADMIN_SESSION_MS=24*60*60*1000;
 const CUSTOMER_SESSION_MS=24*60*60*1000;
 const hash=value=>crypto.createHash('sha256').update(value).digest('hex');
-const cookieBase={httpOnly:true,secure:env.NODE_ENV==='production',sameSite:'strict'};
-const csrfCookieBase={httpOnly:false,secure:env.NODE_ENV==='production',sameSite:'strict',...(env.COOKIE_DOMAIN?{domain:env.COOKIE_DOMAIN}:{})};
+const crossSiteCookies=env.COOKIE_SAME_SITE==='none';
+const cookieBase={httpOnly:true,secure:env.NODE_ENV==='production',sameSite:env.COOKIE_SAME_SITE,...(crossSiteCookies?{partitioned:true}:{})};
+const csrfCookieBase={httpOnly:false,secure:env.NODE_ENV==='production',sameSite:env.COOKIE_SAME_SITE,...(crossSiteCookies?{partitioned:true}:{})};
 const isPrivileged=user=>user.role!=='CUSTOMER';
 const COOKIE_NAMES={storefront:{access:'storeAccessToken',refresh:'storeRefreshToken',csrf:'storeCsrfToken'},admin:{access:'adminAccessToken',refresh:'adminRefreshToken',csrf:'adminCsrfToken'}};
 const LEGACY_COOKIE_NAMES={access:'accessToken',refresh:'refreshToken',csrf:'csrfToken'};
@@ -35,7 +36,7 @@ export async function createSession(req,res,user,{expiresAt}={}){
   res.cookie(names.access,signAccess(user,session.id,accessMaxAge),{...cookieBase,maxAge:accessMaxAge,path:'/'});
   res.cookie(names.refresh,refresh,{...cookieBase,maxAge:remainingMs,path:'/api/v1/auth'});
   res.cookie(names.csrf,csrf,{...csrfCookieBase,maxAge:remainingMs,path:'/'});
-  return session;
+  return{session,csrfToken:csrf};
 }
 
 export async function rotateSession(req){

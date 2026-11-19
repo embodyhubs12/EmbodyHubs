@@ -1,12 +1,16 @@
 const API = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+const CSRF_STORAGE_KEY='embody-store-csrf';
 let authGeneration=0;
 let refreshPromise=null;
-export const authSessionBarrier={current:()=>authGeneration,invalidate:()=>{authGeneration+=1}};
+function storedCsrf(){try{return sessionStorage.getItem(CSRF_STORAGE_KEY)||''}catch{return''}}
+function captureCsrf(data){const token=data?.data?.csrfToken;if(token)try{sessionStorage.setItem(CSRF_STORAGE_KEY,token)}catch{}return data}
+function clearCsrf(){try{sessionStorage.removeItem(CSRF_STORAGE_KEY)}catch{}}
+export const authSessionBarrier={current:()=>authGeneration,invalidate:()=>{authGeneration+=1;clearCsrf()}};
 
 async function refreshSession(){
   if(!refreshPromise){
     const execute=()=>fetch(`${API}/auth/refresh`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json','X-Client':'storefront',...csrfHeaders()}})
-      .then(async response=>({response,data:await response.json().catch(()=>({success:false,message:'Unexpected server response.'}))}));
+      .then(async response=>({response,data:captureCsrf(await response.json().catch(()=>({success:false,message:'Unexpected server response.'})))}));
     const coordinated=typeof navigator!=='undefined'&&navigator.locks?.request?navigator.locks.request('embody-storefront-session-refresh',execute):execute();
     refreshPromise=coordinated.finally(()=>{refreshPromise=null});
   }
@@ -26,6 +30,7 @@ async function request(path, options = {}, mayRefresh = true) {
     if(refreshed?.response.ok)return request(path,options,false);
   }
   const data = await response.json().catch(() => ({ success: false, message: 'Unexpected server response.' }));
+  captureCsrf(data);
   if(generation!==authGeneration)throw new Error('This response belongs to a previous account session and was discarded.');
   if(response.status===401&&!path.startsWith('/auth/'))window.dispatchEvent(new CustomEvent('embody:auth-expired'));
   if (!response.ok) {
@@ -125,4 +130,4 @@ export const api = {
   ,recordPartnerPrescriptionDecision:(id,payload)=>request(`/partnerships/portal/prescriptions/${id}/decision`,{method:'POST',headers:csrfHeaders(),body:JSON.stringify(payload)})
   ,downloadPartnerPrescription:async id=>{const response=await fetch(`${API}/partnerships/portal/prescriptions/${id}/document`,{credentials:'include',headers:{'X-Client':'storefront','X-Access-Purpose':'professional-review'}});if(!response.ok){const data=await response.json().catch(()=>({}));throw new Error(data.message||'Secure document download failed.')}const disposition=response.headers.get('content-disposition')||'';return{name:disposition.match(/filename="([^"]+)"/)?.[1]||'prescription-document',blob:await response.blob()}}
 };
-function csrfHeaders(){const cookies=document.cookie.split('; ');const token=(cookies.find(v=>v.startsWith('storeCsrfToken='))||cookies.find(v=>v.startsWith('csrfToken=')))?.split('=')[1];return token?{'X-CSRF-Token':decodeURIComponent(token)}:{}}
+function csrfHeaders(){let token=storedCsrf();if(!token){const cookies=document.cookie.split('; ');token=(cookies.find(v=>v.startsWith('storeCsrfToken='))||cookies.find(v=>v.startsWith('csrfToken=')))?.split('=')[1]||''}return token?{'X-CSRF-Token':decodeURIComponent(token)}:{}}

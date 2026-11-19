@@ -53,9 +53,9 @@ export async function changeCustomerPassword(req,res){
   const data=customerPasswordSchema.parse(req.body);const user=await User.findById(req.user.sub).select('+passwordHash');
   if(!user||!(await user.verifyPassword(data.currentPassword)))throw new AppError('Current password is incorrect.',400,'CURRENT_PASSWORD_INVALID');
   user.passwordHash=await User.hashPassword(data.newPassword);user.passwordChangedAt=new Date();user.sessionVersion+=1;await user.save();
-  await revokeAllSessions(user.id);const session=await createSession(req,res,user);
+  await revokeAllSessions(user.id);const{session,csrfToken}=await createSession(req,res,user);
   await AuditLog.create({actor:user.id,action:'CUSTOMER_PASSWORD_CHANGED',resourceType:'User',resourceId:user.id,requestId:req.id});
-  res.json({success:true,data:{sessionExpiresAt:session.expiresAt},message:'Password updated. Other sessions were signed out.'});
+  res.json({success:true,data:{sessionExpiresAt:session.expiresAt,csrfToken},message:'Password updated. Other sessions were signed out.'});
 }
 
 export async function revokeOtherCustomerSessions(req,res){
