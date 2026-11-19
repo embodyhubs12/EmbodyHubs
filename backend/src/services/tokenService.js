@@ -10,6 +10,7 @@ const ADMIN_SESSION_MS=24*60*60*1000;
 const CUSTOMER_SESSION_MS=24*60*60*1000;
 const hash=value=>crypto.createHash('sha256').update(value).digest('hex');
 const cookieBase={httpOnly:true,secure:env.NODE_ENV==='production',sameSite:'strict'};
+const csrfCookieBase={httpOnly:false,secure:env.NODE_ENV==='production',sameSite:'strict',...(env.COOKIE_DOMAIN?{domain:env.COOKIE_DOMAIN}:{})};
 const isPrivileged=user=>user.role!=='CUSTOMER';
 const COOKIE_NAMES={storefront:{access:'storeAccessToken',refresh:'storeRefreshToken',csrf:'storeCsrfToken'},admin:{access:'adminAccessToken',refresh:'adminRefreshToken',csrf:'adminCsrfToken'}};
 const LEGACY_COOKIE_NAMES={access:'accessToken',refresh:'refreshToken',csrf:'csrfToken'};
@@ -33,7 +34,7 @@ export async function createSession(req,res,user,{expiresAt}={}){
   const names=familyForUser(user);
   res.cookie(names.access,signAccess(user,session.id,accessMaxAge),{...cookieBase,maxAge:accessMaxAge,path:'/'});
   res.cookie(names.refresh,refresh,{...cookieBase,maxAge:remainingMs,path:'/api/v1/auth'});
-  res.cookie(names.csrf,csrf,{httpOnly:false,secure:env.NODE_ENV==='production',sameSite:'strict',maxAge:remainingMs,path:'/'});
+  res.cookie(names.csrf,csrf,{...csrfCookieBase,maxAge:remainingMs,path:'/'});
   return session;
 }
 
@@ -49,5 +50,5 @@ export async function rotateSession(req){
 
 export async function revokeSession(refresh){if(refresh)await Session.updateOne({tokenHash:hash(refresh),revokedAt:null},{revokedAt:new Date()})}
 export async function revokeAllSessions(userId){await Session.updateMany({user:userId,revokedAt:null},{revokedAt:new Date()})}
-export function clearSession(reqOrRes,resMaybe,{all=false}={}){const req=resMaybe?reqOrRes:null;const res=resMaybe||reqOrRes;const families=all||!req?[COOKIE_NAMES.storefront,COOKIE_NAMES.admin]:[familyForRequest(req)];for(const names of families){res.clearCookie(names.access,{...cookieBase,path:'/'});res.clearCookie(names.refresh,{...cookieBase,path:'/api/v1/auth'});res.clearCookie(names.csrf,{secure:env.NODE_ENV==='production',sameSite:'strict',path:'/'})}for(const [kind,name] of Object.entries(LEGACY_COOKIE_NAMES))res.clearCookie(name,{...(kind==='csrf'?{secure:env.NODE_ENV==='production',sameSite:'strict'}:cookieBase),path:kind==='refresh'?'/api/v1/auth':'/'})}
+export function clearSession(reqOrRes,resMaybe,{all=false}={}){const req=resMaybe?reqOrRes:null;const res=resMaybe||reqOrRes;const families=all||!req?[COOKIE_NAMES.storefront,COOKIE_NAMES.admin]:[familyForRequest(req)];for(const names of families){res.clearCookie(names.access,{...cookieBase,path:'/'});res.clearCookie(names.refresh,{...cookieBase,path:'/api/v1/auth'});res.clearCookie(names.csrf,{...csrfCookieBase,path:'/'})}for(const [kind,name] of Object.entries(LEGACY_COOKIE_NAMES))res.clearCookie(name,{...(kind==='csrf'?csrfCookieBase:cookieBase),path:kind==='refresh'?'/api/v1/auth':'/'})}
 export const tokenHash=hash;
