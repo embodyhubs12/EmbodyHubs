@@ -70,4 +70,5 @@ function Dashboard(){
   </div>;
 }
 function Gate(){const{user,checking}=useAdminAuth();if(checking)return <div className="admin-auth-loading"><ShieldCheck/><p>Verifying secure session…</p></div>;return user?<Dashboard/>:<AdminLogin/>}
-createRoot(document.getElementById('root')).render(<React.StrictMode><BrowserRouter><AdminAuthProvider><Gate/></AdminAuthProvider></BrowserRouter></React.StrictMode>);
+function AdminRoot(){const location=useLocation();if(location.pathname==='/admin'||location.pathname.startsWith('/admin/')){const path=location.pathname.slice('/admin'.length)||'/';return <Navigate replace to={`${path}${location.search}${location.hash}`}/>};return <AdminAuthProvider><Gate/></AdminAuthProvider>}
+createRoot(document.getElementById('root')).render(<React.StrictMode><BrowserRouter><AdminRoot/></BrowserRouter></React.StrictMode>);
