@@ -8,7 +8,7 @@ import { getMyPartnershipApplication,getPartnerPortal,submitPartnershipApplicati
 import { acknowledgePartnerReceipt,downloadPrescription,listPartnerPrescriptions,recordPartnerDecision,startPartnerReview } from '../controllers/prescriptionController.js';
 
 export const partnershipRoutes=Router();
-const applicationLimit=rateLimit({windowMs:60*60*1000,limit:5,standardHeaders:'draft-8',legacyHeaders:false,message:{success:false,code:'RATE_LIMITED',message:'Too many partnership application attempts. Please try again later.'}});
+const applicationLimit=rateLimit({windowMs:60*60*1000,limit:15,keyGenerator:req=>String(req.user.sub),standardHeaders:'draft-8',legacyHeaders:false,message:{success:false,code:'RATE_LIMITED',message:'Too many partnership application attempts. Please review the highlighted fields and try again later.'}});
 const uploadLimit=rateLimit({windowMs:60*60*1000,limit:20,standardHeaders:'draft-8',legacyHeaders:false,message:{success:false,code:'RATE_LIMITED',message:'Too many document upload attempts. Please try again later.'}});
 const verificationLimit=rateLimit({windowMs:15*60*1000,limit:20,standardHeaders:'draft-8',legacyHeaders:false,message:{success:false,code:'RATE_LIMITED',message:'Too many verification attempts. Please try again later.'}});
 partnershipRoutes.get('/verify-email',verificationLimit,asyncHandler(verifyPartnershipEmail));

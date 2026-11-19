@@ -28,7 +28,15 @@ async function request(path, options = {}, mayRefresh = true) {
   const data = await response.json().catch(() => ({ success: false, message: 'Unexpected server response.' }));
   if(generation!==authGeneration)throw new Error('This response belongs to a previous account session and was discarded.');
   if(response.status===401&&!path.startsWith('/auth/'))window.dispatchEvent(new CustomEvent('embody:auth-expired'));
-  if (!response.ok) { const detail=Object.values(data.errors||{}).flat().find(Boolean); throw new Error(detail||data.message||'Request failed. Please try again.'); }
+  if (!response.ok) {
+    const detail=Object.values(data.errors||{}).flat().find(Boolean);
+    const error=new Error(detail||data.message||'Request failed. Please try again.');
+    error.status=response.status;
+    error.code=data.code;
+    error.errors=data.errors||{};
+    error.requestId=data.requestId;
+    throw error;
+  }
   return data;
 }
 
